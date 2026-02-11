@@ -6,3 +6,4 @@ CREATE TABLE IF NOT EXISTS employees (
     city VARCHAR(100),
     salary INT
 ); 
+
