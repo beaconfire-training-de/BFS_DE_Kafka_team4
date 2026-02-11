@@ -46,6 +46,28 @@ class cdcProducer(Producer):
                           'acks' : 'all'}
         super().__init__(producerConfig)
         self.running = True
+        self.last_action_id = 0
+
+    def load_offset(self, cur):
+        try:
+            cur.execute('SELECT last_action_id FROM cdc_offset WHERE id = 1')
+            result = cur.fetchone()
+            if result:
+                self.last_action_id = result[0]
+                print(f'Loaded offset: {self.last_action_id}')
+
+        except Exception as e:
+            print(f'Error loading offset: {e}')
+            #double check this
+            self.last_action_id = 0
+
+    def save_offset(self, cur, action_id):
+        try:
+            cur.execute('UPDATE cdc_offset SET last_action_id = %s WHERE id = 1', (action_id))
+            self.last_action_id = action_id
+
+        except Exception as e:
+            print(f'Error saving offset: {e}')
     
     def fetch_cdc(self,):
         try:
@@ -58,14 +80,27 @@ class cdcProducer(Producer):
             conn.autocommit = True
             cur = conn.cursor()
             #your logic should go here
-            
-
-
+            conn.autocommit = True
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT action_id, emp_id, first_name, last_name, dob, city, salary, action
+                        FROM emp_cdc 
+                WHERE action_id > %s
+            """, (
+                self.last_action_id
+            ))
+            records = cur.fetchall()
             cur.close()
+            conn.close()
+            if records:
+                print(f'Fetched {len(records)} new CDC records.')
+                print(type(records))
+                self.last_action_id = records[-1][0]
+
         except Exception as err:
-            pass
+            print(f'Error fetching CDC data: {err}')
         
-        return # if you need to return sth, modify here
+        return records# if you need to return sth, modify here
     
 
 if __name__ == '__main__':
