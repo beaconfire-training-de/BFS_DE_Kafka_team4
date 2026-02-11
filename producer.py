@@ -29,7 +29,7 @@ import os
 from confluent_kafka import Producer
 from employee import Employee
 import confluent_kafka
-from pyspark.sql import SparkSession
+# from pyspark.sql import SparkSession
 import pandas as pd
 from confluent_kafka.serialization import StringSerializer
 import psycopg2
