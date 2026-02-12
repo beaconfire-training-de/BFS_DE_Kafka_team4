@@ -1,0 +1,11 @@
+# Python dependencies for BFS_DE_Kafka_team4 CDC Pipeline
+
+# Kafka client library
+confluent-kafka>=2.3.0
+
+# PostgreSQL adapter for Python
+psycopg2-binary>=2.9.0
+
+# Data manipulation (optional, used in some scripts)
+pandas>=2.0.0
+

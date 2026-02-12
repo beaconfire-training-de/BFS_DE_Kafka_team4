@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS employees (
 
 CREATE TABLE IF NOT EXISTS emp_cdc(
     action_id SERIAL PRIMARY KEY,
+    emp_id INT, 
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     dob DATE,
