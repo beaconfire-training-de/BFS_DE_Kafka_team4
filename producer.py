@@ -71,6 +71,7 @@ class cdcProducer(Producer):
     
     def fetch_cdc(self,):
         try:
+            records = []
             conn = psycopg2.connect(
                 host="localhost",
                 database="postgres",
@@ -82,20 +83,22 @@ class cdcProducer(Producer):
             #your logic should go here
             conn.autocommit = True
             cur = conn.cursor()
+            self.load_offset(cur)
             cur.execute("""
-                SELECT action_id, emp_id, first_name, last_name, dob, city, salary, action
+                SELECT action_id, first_name, last_name, dob, city, salary, action, created_at
                         FROM emp_cdc 
                 WHERE action_id > %s
             """, (
-                self.last_action_id
+                self.last_action_id,
             ))
             records = cur.fetchall()
-            cur.close()
-            conn.close()
             if records:
                 print(f'Fetched {len(records)} new CDC records.')
                 print(type(records))
-                self.last_action_id = records[-1][0]
+                last_action_id = records[-1][0]
+                self.save_offset(cur, last_action_id)
+            cur.close()
+            conn.close()
 
         except Exception as err:
             print(f'Error fetching CDC data: {err}')
@@ -109,5 +112,23 @@ if __name__ == '__main__':
     
     while producer.running:
         # your implementation goes here
-        pass
+        try:
+            cdc_records = producer.fetch_cdc()
+
+            for record in cdc_records:
+                employee = Employee.from_line(record)
+                message = employee.to_json()
+                producer.produce(
+                    topic= employee_topic_name,
+                    key = encoder(str(employee.emp_id)),
+                    value = encoder(message),
+                )
+                producer.poll(0)
+                print(f'Completed {employee.action} for emp_id: {employee.emp_id}')
+            producer.flush()
+            print('finished')
+        except Exception as e:
+            print(f'Encountered error: {e}')
+            print("Actual DB error:", repr(e))
+            break
     
