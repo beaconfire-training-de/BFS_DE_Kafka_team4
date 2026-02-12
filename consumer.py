@@ -78,5 +78,5 @@ def update_dst(msg):
         print(err)
 
 if __name__ == '__main__':
-    consumer = cdcConsumer(group_id=?) 
+    consumer = cdcConsumer(group_id='employee-migration') 
     consumer.consume([employee_topic_name], update_dst)
