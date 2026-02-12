@@ -51,7 +51,7 @@ services:
       - '5432:5432'
     volumes:
       - db_source:/var/lib/bf_kafka_proj2_source/data
-      - ./scripts/source:/docker-entrypoint-initdb.d
+      - ./sql/source_init.sql:/docker-entrypoint-initdb.d/source_init.sql
 
   db_dst:
     image: postgres:14.1-alpine
@@ -62,8 +62,8 @@ services:
     ports:
       - '5433:5432'
     volumes:
-      - db_dst:/var/lib/bf_kafka_proj2_dst/data
-      - ./scripts/destination:/docker-entrypoint-initdb.d
+      - db_dst:/var/lib/bf_kafka_proj2_source/data
+      - ./sql/dest_init.sql:/docker-entrypoint-initdb.d/dest_init.sql
 
 volumes:
   db_source:
