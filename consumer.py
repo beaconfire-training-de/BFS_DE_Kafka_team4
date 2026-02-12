@@ -51,14 +51,25 @@ class cdcConsumer(Consumer):
         try:
             self.subscribe(topics)
             while self.keep_runnning:
-                #implement your logic here
+                while self.keep_runnning:
+                    msg = self.poll(1.0)
 
-                pass
+                    if msg is None:
+                        continue
+                    if msg.error():
+                        if msg.error().code() == KafkaError._PARTITION_EOF:
+                            continue
+                        else:
+                            raise KafkaException(msg.error())
+                    else:
+                        processing_func(msg)
+
         finally:
             self.close()
 
 def update_dst(msg):
     e = Employee(**(json.loads(msg.value())))
+    print("Consuming:", msg.value())
     try:
         conn = psycopg2.connect(
             host="localhost",
@@ -68,15 +79,32 @@ def update_dst(msg):
             password="postgres")
         conn.autocommit = True
         cur = conn.cursor()
-        #your logic goes here
+        if e.action == 'INSERT':
+            cur.execute("""
+                INSERT INTO employees(emp_id, first_name, last_name, dob, city, salary)
+                VALUES (%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (emp_id) DO NOTHING
+            """, (e.emp_id, e.emp_FN, e.emp_LN, e.emp_dob, e.emp_city, e.emp_salary))
 
+        elif e.action == 'UPDATE':
+            cur.execute("""
+                UPDATE employees
+                SET first_name=%s,
+                    last_name=%s,
+                    dob=%s,
+                    city=%s,
+                    salary=%s
+                WHERE emp_id=%s
+            """, (e.emp_FN, e.emp_LN, e.emp_dob, e.emp_city, e.emp_salary, e.emp_id))
 
-
+        elif e.action == 'DELETE':
+            cur.execute("DELETE FROM employees WHERE emp_id=%s", (e.emp_id,))
 
         cur.close()
+        conn.close()
     except Exception as err:
         print(err)
 
 if __name__ == '__main__':
-    consumer = cdcConsumer(group_id='employee-migration') 
+    consumer = cdcConsumer(group_id="bf_group") 
     consumer.consume([employee_topic_name], update_dst)
