@@ -50,61 +50,68 @@ class cdcConsumer(Consumer):
     def consume(self, topics, processing_func):
         try:
             self.subscribe(topics)
+            print(f'Consumer subsribed to topics: {topics}')
             while self.keep_runnning:
-                while self.keep_runnning:
-                    msg = self.poll(1.0)
-
-                    if msg is None:
-                        continue
-                    if msg.error():
-                        if msg.error().code() == KafkaError._PARTITION_EOF:
-                            continue
-                        else:
-                            raise KafkaException(msg.error())
-                    else:
-                        processing_func(msg)
-
+                msg = self.poll(timeout=1.0)
+                print(msg)
+                if msg is None:
+                    print('check')
+                    continue
+                elif msg.error():
+                    raise KafkaException(msg.error())
+                else:
+                    print('uh')
+                    processing_func(msg)
+                    print('works')
         finally:
             self.close()
 
 def update_dst(msg):
     e = Employee(**(json.loads(msg.value())))
-    print("Consuming:", msg.value())
     try:
         conn = psycopg2.connect(
             host="localhost",
             database="postgres",
             user="postgres",
-            port = '5433', # change this port number to align with the docker compose file
+            port = '5433', 
             password="postgres")
         conn.autocommit = True
         cur = conn.cursor()
         if e.action == 'INSERT':
-            cur.execute("""
-                INSERT INTO employees(emp_id, first_name, last_name, dob, city, salary)
-                VALUES (%s,%s,%s,%s,%s,%s)
-                ON CONFLICT (emp_id) DO NOTHING
-            """, (e.emp_id, e.emp_FN, e.emp_LN, e.emp_dob, e.emp_city, e.emp_salary))
-
+            cur.execute(
+                    """
+                    INSERT INTO employees (emp_id, first_name, last_name, dob, city, salary)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        e.emp_id, e.first_name, e.last_name, e.dob, e.city, e.salary,
+                    ))
+            print(f'Inserted Employee: {e.emp_id}')
         elif e.action == 'UPDATE':
-            cur.execute("""
-                UPDATE employees
-                SET first_name=%s,
-                    last_name=%s,
-                    dob=%s,
-                    city=%s,
-                    salary=%s
-                WHERE emp_id=%s
-            """, (e.emp_FN, e.emp_LN, e.emp_dob, e.emp_city, e.emp_salary, e.emp_id))
+            cur.execute(
+                    """
+                    UPDATE employees
+                    SET first_name = %s, last_name = %s, dob = %s, city = %s, salary = %s
+                    WHERE emp_id = %s
+                    """, (
+                        e.first_name, e.last_name, e.dob, e.city, e.salary, e.emp_id, 
+                    ))
+            print(f'Updated Employee: {e.emp_id}')
 
         elif e.action == 'DELETE':
-            cur.execute("DELETE FROM employees WHERE emp_id=%s", (e.emp_id,))
-
+            cur.execute(
+                    """
+                    DELETE FROM employees
+                    WHERE emp_id = %s
+                    """, (
+                        e.emp_id, 
+                    ))
+            print(f'Deleted Employee: {e.emp_id}')
+        
         cur.close()
         conn.close()
     except Exception as err:
         print(err)
 
 if __name__ == '__main__':
-    consumer = cdcConsumer(group_id="bf_group") 
+    consumer = cdcConsumer(group_id='employee-migration-v2') 
     consumer.consume([employee_topic_name], update_dst)
