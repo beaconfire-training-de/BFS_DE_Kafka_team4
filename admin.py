@@ -55,4 +55,3 @@ if __name__ == '__main__':
         client.delete_topic([employee_topic_name])
     else:
         client.create_topic(employee_topic_name, num_parition)
-    
