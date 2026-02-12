@@ -50,10 +50,19 @@ class cdcConsumer(Consumer):
     def consume(self, topics, processing_func):
         try:
             self.subscribe(topics)
+            print(f'Consumer subsribed to topics: {topics}')
             while self.keep_runnning:
-                #implement your logic here
-
-                pass
+                msg = self.poll(timeout=1.0)
+                print(msg)
+                if msg is None:
+                    print('check')
+                    continue
+                elif msg.error():
+                    raise KafkaException(msg.error())
+                else:
+                    print('uh')
+                    processing_func(msg)
+                    print('works')
         finally:
             self.close()
 
@@ -64,19 +73,45 @@ def update_dst(msg):
             host="localhost",
             database="postgres",
             user="postgres",
-            port = '5433', # change this port number to align with the docker compose file
+            port = '5433', 
             password="postgres")
         conn.autocommit = True
         cur = conn.cursor()
-        #your logic goes here
+        if e.action == 'INSERT':
+            cur.execute(
+                    """
+                    INSERT INTO employees (emp_id, first_name, last_name, dob, city, salary)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        e.emp_id, e.first_name, e.last_name, e.dob, e.city, e.salary,
+                    ))
+            print(f'Inserted Employee: {e.emp_id}')
+        elif e.action == 'UPDATE':
+            cur.execute(
+                    """
+                    UPDATE employees
+                    SET first_name = %s, last_name = %s, dob = %s, city = %s, salary = %s
+                    WHERE emp_id = %s
+                    """, (
+                        e.first_name, e.last_name, e.dob, e.city, e.salary, e.emp_id, 
+                    ))
+            print(f'Updated Employee: {e.emp_id}')
 
-
-
-
+        elif e.action == 'DELETE':
+            cur.execute(
+                    """
+                    DELETE FROM employees
+                    WHERE emp_id = %s
+                    """, (
+                        e.emp_id, 
+                    ))
+            print(f'Deleted Employee: {e.emp_id}')
+        
         cur.close()
+        conn.close()
     except Exception as err:
         print(err)
 
 if __name__ == '__main__':
-    consumer = cdcConsumer(group_id='employee-migration') 
+    consumer = cdcConsumer(group_id='employee-migration-v2') 
     consumer.consume([employee_topic_name], update_dst)

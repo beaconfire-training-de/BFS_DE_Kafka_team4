@@ -63,8 +63,9 @@ class cdcProducer(Producer):
 
     def save_offset(self, cur, action_id):
         try:
-            cur.execute('UPDATE cdc_offset SET last_action_id = %s WHERE id = 1', (action_id))
+            cur.execute('UPDATE cdc_offset SET last_action_id = %s WHERE id = 1', (action_id,))
             self.last_action_id = action_id
+            print(f'New Offset saved')
 
         except Exception as e:
             print(f'Error saving offset: {e}')
@@ -80,7 +81,6 @@ class cdcProducer(Producer):
                 password="postgres")
             conn.autocommit = True
             cur = conn.cursor()
-            #your logic should go here
             conn.autocommit = True
             cur = conn.cursor()
             self.load_offset(cur)
@@ -94,7 +94,6 @@ class cdcProducer(Producer):
             records = cur.fetchall()
             if records:
                 print(f'Fetched {len(records)} new CDC records.')
-                print(type(records))
                 last_action_id = records[-1][0]
                 self.save_offset(cur, last_action_id)
             cur.close()
@@ -103,15 +102,19 @@ class cdcProducer(Producer):
         except Exception as err:
             print(f'Error fetching CDC data: {err}')
         
-        return records# if you need to return sth, modify here
+        return records
     
+    def delivery_callback(self, err, msg):
+        if err:
+            print(f'Message delivery failed: {err}')
+        else:
+            print(f'Message delivered to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}')
 
 if __name__ == '__main__':
     encoder = StringSerializer('utf-8')
     producer = cdcProducer()
     
     while producer.running:
-        # your implementation goes here
         try:
             cdc_records = producer.fetch_cdc()
 
@@ -122,13 +125,12 @@ if __name__ == '__main__':
                     topic= employee_topic_name,
                     key = encoder(str(employee.emp_id)),
                     value = encoder(message),
+                    callback= producer.delivery_callback
                 )
                 producer.poll(0)
                 print(f'Completed {employee.action} for emp_id: {employee.emp_id}')
             producer.flush()
-            print('finished')
         except Exception as e:
             print(f'Encountered error: {e}')
             print("Actual DB error:", repr(e))
-            break
     

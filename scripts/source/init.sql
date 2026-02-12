@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS employees (
 
 CREATE TABLE IF NOT EXISTS emp_cdc(
     action_id SERIAL PRIMARY KEY,
+    emp_id INT,
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     dob DATE,
@@ -44,7 +45,7 @@ CREATE TRIGGER employee_audit_trigger
 AFTER INSERT OR UPDATE OR DELETE ON employees
 FOR EACH ROW EXECUTE FUNCTION log_employee_changes();
 
-CREATE tABLE IF NOT EXISTS cdc_offset(
+CREATE TABLE IF NOT EXISTS cdc_offset(
     id INT PRIMARY KEY DEFAULT 1,
     last_action_id INT DEFAULT 0,
     CHECK (id =1)
