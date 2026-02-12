@@ -24,7 +24,6 @@ class cdcProducer(Producer):
             result = cur.fetchone()
             if result:
                 self.last_action_id = result[0]
-                print(f'Loaded offset: {self.last_action_id}')
             else:
                 self.last_action_id = 0
         except Exception as e:
@@ -78,7 +77,6 @@ class cdcProducer(Producer):
                     emp = Employee.from_line(r)
                     self.produce(employee_topic_name, value=emp.to_json())
                     self.flush()
-                    print("Produced:", emp.to_json())
                     self.last_action_id = r[0]
 
                 # Save last offset
