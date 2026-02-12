@@ -69,7 +69,6 @@ class cdcConsumer(Consumer):
 
 def update_dst(msg):
     e = Employee(**(json.loads(msg.value())))
-    print("Consuming:", msg.value())
     try:
         conn = psycopg2.connect(
             host="localhost",
