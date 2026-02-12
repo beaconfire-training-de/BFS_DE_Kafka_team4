@@ -1,4 +1,4 @@
-# BFS_DE_Kafka_team4 - Change Data Capture (CDC) Pipeline
+# BFS_DE_Kafka_team4 
 
 A Change Data Capture (CDC) system using Apache Kafka to replicate employee data changes between two PostgreSQL databases in real-time.
 
@@ -723,61 +723,6 @@ This script automatically tests:
 - UPDATE operation replication
 - DELETE operation replication
 
-**Expected output:**
-```
-============================================================
-CDC Pipeline Verification Tests
-============================================================
-
-============================================================
-TEST 1: Database Connections
-============================================================
-✓ Source database connection: OK
-✓ Destination database connection: OK
-
-============================================================
-TEST 2: CDC Trigger Functionality
-============================================================
-✓ CDC trigger is working - new CDC record created
-
-============================================================
-TEST 3: INSERT Operation Replication
-============================================================
-✓ Record inserted in source database (emp_id=8888)
-  Waiting 10 seconds for replication...
-✓ INSERT replication successful - record found in destination
-
-... (more tests)
-
-============================================================
-TEST SUMMARY
-============================================================
-✓ PASS: Database Connections
-✓ PASS: CDC Trigger
-✓ PASS: INSERT Replication
-✓ PASS: UPDATE Replication
-✓ PASS: DELETE Replication
-
-============================================================
-Results: 5/5 tests passed
-============================================================
-
-🎉 All tests passed! Your CDC pipeline is working correctly.
-```
-
-### Success Criteria
-
-Your pipeline is working correctly if:
-
-✅ All Docker services are running  
-✅ Kafka topics exist (`bf_employee_cdc` and `bf_employee_cdc_dlq`)  
-✅ Producer detects and publishes CDC records  
-✅ Consumer processes messages and applies to destination DB  
-✅ INSERT, UPDATE, DELETE operations are replicated correctly  
-✅ Offset tracking works (producer resumes from last position)  
-✅ DLQ captures failed messages  
-✅ No data loss or duplication  
-✅ Consumer group shows proper offset tracking  
 
 ## Troubleshooting
 
@@ -834,36 +779,10 @@ SELECT * FROM pg_trigger WHERE tgname = 'employee_audit_trigger';
 - **Solution**: Modify ports in `docker-compose.yml` if conflicts occur
 - Update connection strings in producer/consumer accordingly
 
-## 📝 Notes
+## Notes
 
 - **Offset Tracking**: The producer saves offset only after successfully publishing all records in a batch
 - **Retry Logic**: Consumer retries failed messages up to 3 times with exponential backoff (2s, 4s, 8s)
 - **Partitioning**: Employee ID is used as message key to ensure same employee records go to same partition
 - **Auto-commit**: Consumer uses auto-commit for simplicity; consider manual commits for production
 - **DLQ Producer**: Separate producer instances are used for DLQ to avoid circular dependencies
-
-## 🔐 Security Considerations
-
-⚠️ **For Production Use:**
-
-- Use environment variables for database credentials
-- Enable SSL/TLS for Kafka connections
-- Use SASL authentication for Kafka
-- Implement proper secret management
-- Use connection pooling for database connections
-- Add monitoring and alerting
-- Consider using Schema Registry for message validation
-
-## 📚 Additional Resources
-
-- [Confluent Kafka Python Client Documentation](https://docs.confluent.io/kafka-clients/python/current/overview.html)
-- [PostgreSQL Triggers Documentation](https://www.postgresql.org/docs/current/triggers.html)
-- [Kafka Best Practices](https://kafka.apache.org/documentation/#bestpractices)
-
-## 👥 Team
-
-BFS_DE_Kafka_team4 - BeaconFire Staffing Solutions
-
-## 📄 License
-
-See individual file headers for license information
