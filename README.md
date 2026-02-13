@@ -26,22 +26,34 @@ This project implements a CDC pipeline that:
 ## Architecture
 
 ```
-┌─────────────────┐         ┌──────────────┐         ┌─────────────────┐
-│  Source DB      │         │    Kafka     │         │ Destination DB   │
-│  (Port 5432)    │         │  (Port 29092)│         │  (Port 5433)     │
-│                 │         │              │         │                  │
-│  employees      │         │  bf_employee │         │  employees       │
-│  emp_cdc        │────────▶│  _cdc        │────────▶│                  │
-│  (triggers)     │         │              │         │                  │
-└─────────────────┘         └──────────────┘         └─────────────────┘
-                                     │
-                                     │ Failed Messages
-                                     ▼
-                            ┌─────────────────┐
-                            │       DLQ       │
-                            │  bf_employee_   │
-                            │  cdc_dlq        │
-                            └─────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     CDC Pipeline Flow                           │
+└─────────────────────────────────────────────────────────────────┘
+
+    Source Database          Kafka Cluster       Destination Database
+    (PostgreSQL)             (Topics)            (PostgreSQL)
+         │                       │                       │
+         │                       │                       │
+    ┌────▼────┐             ┌────▼────┐            ┌────▼────┐
+    │employees│             │         │            │employees│
+    │  table  │             │  Topic  │            │  table  │
+    └────┬────┘             │bf_emp..│            └────▲────┘
+         │                  │         │                 │
+    ┌────▼────┐             └────┬────┘                │
+    │Trigger  │                  │                     │
+    │Function │                  │                     │
+    └────┬────┘                  │                     │
+         │                       │                     │
+    ┌────▼────┐             ┌────▼────┐          ┌────┴────┐
+    │emp_cdc  │───Producer──▶ Messages ├──Consumer▶ Apply   │
+    │  table  │             │  Stream  │          │ Changes │
+    └─────────┘             └──────────┘          └─────────┘
+         │                       │                     │
+         │                       │                     │
+    ┌────▼────┐             ┌────▼────┐          ┌────▼────┐
+    │cdc_     │             │  DLQ    │          │ Synced  │
+    │offset   │             │ Topic   │          │  Data   │
+    └─────────┘             └─────────┘          └─────────┘
 ```
 
 ### Components
