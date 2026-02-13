@@ -14,6 +14,9 @@ Run this script while producer.py and consumer.py are running.
 import psycopg2
 import time
 import sys
+import json
+import subprocess
+import os
 
 def test_database_connections():
     """Test connections to both source and destination databases."""
@@ -303,6 +306,230 @@ def test_delete_replication():
         return False
 
 
+def test_consumer_dlq_database_failure():
+    """
+    Test that consumer sends messages to DLQ when destination database is unavailable.
+    This test requires manually stopping the destination database.
+    """
+    print("\n" + "=" * 60)
+    print("TEST 6: Consumer DLQ - Database Failure")
+    print("=" * 60)
+    print("\n⚠️  MANUAL TEST REQUIRED:")
+    print("  1. Stop destination database: docker-compose stop db_dst")
+    print("  2. Insert a record in source database")
+    print("  3. Watch consumer logs - should show retry attempts and DLQ message")
+    print("  4. Check DLQ topic for the failed message")
+    print("  5. Restart database: docker-compose start db_dst")
+    print("\nPress Enter after completing the manual steps to verify DLQ message...")
+    
+    try:
+        input()
+        
+        # Check if DLQ topic has messages
+        # Get Kafka container
+        result = subprocess.run(
+            ["docker", "compose", "ps", "-q", "kafka"],
+            capture_output=True,
+            text=True,
+            cwd=os.getcwd()
+        )
+        
+        if result.returncode != 0:
+            print("✗ Could not find Kafka container")
+            return False
+        
+        kafka_container = result.stdout.strip()
+        if not kafka_container:
+            print("✗ Kafka container not found")
+            return False
+        
+        # Check DLQ topic for messages
+        check_cmd = [
+            "docker", "exec", kafka_container,
+            "kafka-console-consumer",
+            "--bootstrap-server", "kafka:9092",
+            "--topic", "bf_employee_cdc_dlq",
+            "--from-beginning",
+            "--max-messages", "1",
+            "--timeout-ms", "5000"
+        ]
+        
+        result = subprocess.run(
+            check_cmd,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode == 0 and result.stdout.strip():
+            print("✓ DLQ message found - Consumer DLQ test passed")
+            print(f"  DLQ message preview: {result.stdout[:200]}...")
+            return True
+        else:
+            print("✗ No DLQ message found")
+            print("  Make sure:")
+            print("    - Destination database was stopped")
+            print("    - A record was inserted in source database")
+            print("    - Consumer was running and attempted to process the message")
+            return False
+            
+    except Exception as e:
+        print(f"✗ Consumer DLQ test failed: {e}")
+        return False
+
+
+def test_dlq_message_format():
+    """Test that DLQ messages have the correct format."""
+    print("\n" + "=" * 60)
+    print("TEST 7: DLQ Message Format Verification")
+    print("=" * 60)
+    
+    try:
+        # Get Kafka container
+        result = subprocess.run(
+            ["docker", "compose", "ps", "-q", "kafka"],
+            capture_output=True,
+            text=True,
+            cwd=os.getcwd()
+        )
+        
+        if result.returncode != 0:
+            print("✗ Could not find Kafka container")
+            return False
+        
+        kafka_container = result.stdout.strip()
+        if not kafka_container:
+            print("✗ Kafka container not found")
+            return False
+        
+        # Consume one message from DLQ
+        check_cmd = [
+            "docker", "exec", kafka_container,
+            "kafka-console-consumer",
+            "--bootstrap-server", "kafka:9092",
+            "--topic", "bf_employee_cdc_dlq",
+            "--from-beginning",
+            "--max-messages", "1",
+            "--timeout-ms", "5000"
+        ]
+        
+        result = subprocess.run(
+            check_cmd,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode != 0 or not result.stdout.strip():
+            print("⚠️  No DLQ messages found to verify format")
+            print("  This is OK if no failures have occurred yet")
+            return True  # Not a failure, just no messages
+        
+        # Try to parse the DLQ message
+        try:
+            dlq_message = json.loads(result.stdout.strip())
+            
+            # Verify required fields
+            required_fields = ['original_topic', 'original_key', 'original_value', 'error', 'timestamp']
+            missing_fields = [field for field in required_fields if field not in dlq_message]
+            
+            if missing_fields:
+                print(f"✗ DLQ message missing required fields: {missing_fields}")
+                return False
+            
+            print("✓ DLQ message format is correct")
+            print(f"  Original topic: {dlq_message.get('original_topic')}")
+            print(f"  Error: {dlq_message.get('error')[:100]}...")
+            print(f"  Has timestamp: {'timestamp' in dlq_message}")
+            return True
+            
+        except json.JSONDecodeError as e:
+            print(f"✗ DLQ message is not valid JSON: {e}")
+            return False
+            
+    except Exception as e:
+        print(f"✗ DLQ format verification failed: {e}")
+        return False
+
+
+def test_dlq_topic_exists():
+    """Verify that DLQ topic exists in Kafka."""
+    print("\n" + "=" * 60)
+    print("TEST 8: DLQ Topic Existence")
+    print("=" * 60)
+    
+    try:
+        # Get Kafka container
+        result = subprocess.run(
+            ["docker", "compose", "ps", "-q", "kafka"],
+            capture_output=True,
+            text=True,
+            cwd=os.getcwd()
+        )
+        
+        if result.returncode != 0:
+            print("✗ Could not find Kafka container")
+            return False
+        
+        kafka_container = result.stdout.strip()
+        if not kafka_container:
+            print("✗ Kafka container not found")
+            return False
+        
+        # List topics
+        list_cmd = [
+            "docker", "exec", kafka_container,
+            "kafka-topics",
+            "--list",
+            "--bootstrap-server", "kafka:9092"
+        ]
+        
+        result = subprocess.run(
+            list_cmd,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode != 0:
+            print(f"✗ Failed to list topics: {result.stderr}")
+            return False
+        
+        topics = result.stdout.strip().split('\n')
+        
+        if 'bf_employee_cdc_dlq' in topics:
+            print("✓ DLQ topic 'bf_employee_cdc_dlq' exists")
+            
+            # Get topic details
+            describe_cmd = [
+                "docker", "exec", kafka_container,
+                "kafka-topics",
+                "--describe",
+                "--bootstrap-server", "kafka:9092",
+                "--topic", "bf_employee_cdc_dlq"
+            ]
+            
+            describe_result = subprocess.run(
+                describe_cmd,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if describe_result.returncode == 0:
+                print(f"  Topic details:\n{describe_result.stdout}")
+            
+            return True
+        else:
+            print("✗ DLQ topic 'bf_employee_cdc_dlq' not found")
+            print(f"  Available topics: {topics}")
+            return False
+            
+    except Exception as e:
+        print(f"✗ DLQ topic check failed: {e}")
+        return False
+
+
 def main():
     """Run all tests."""
     print("\n" + "=" * 60)
@@ -325,6 +552,11 @@ def main():
     results.append(("INSERT Replication", test_insert_replication()))
     results.append(("UPDATE Replication", test_update_replication()))
     results.append(("DELETE Replication", test_delete_replication()))
+    
+    # DLQ tests
+    results.append(("DLQ Topic Exists", test_dlq_topic_exists()))
+    results.append(("DLQ Message Format", test_dlq_message_format()))
+    results.append(("Consumer DLQ (Manual)", test_consumer_dlq_database_failure()))
     
     # Summary
     print("\n" + "=" * 60)
