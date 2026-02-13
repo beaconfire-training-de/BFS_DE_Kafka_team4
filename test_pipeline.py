@@ -14,6 +14,9 @@ Run this script while producer.py and consumer.py are running.
 import psycopg2
 import time
 import sys
+import json
+import subprocess
+import os
 
 def test_database_connections():
     """Test connections to both source and destination databases."""
@@ -325,6 +328,7 @@ def main():
     results.append(("INSERT Replication", test_insert_replication()))
     results.append(("UPDATE Replication", test_update_replication()))
     results.append(("DELETE Replication", test_delete_replication()))
+    
     
     # Summary
     print("\n" + "=" * 60)
