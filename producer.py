@@ -106,6 +106,8 @@ class cdcProducer(Producer):
             cur.execute('UPDATE cdc_offset SET last_action_id = %s WHERE id = 1', (action_id,))
             self.last_action_id = action_id
             print(f'Saved offset: {self.last_action_id}')
+            print(f'New Offset saved')
+
         except Exception as e:
             print(f'Error saving offset: {e}')
     
@@ -120,6 +122,7 @@ class cdcProducer(Producer):
         records = []
         try:
             # Connect to source PostgreSQL database
+            records = []
             conn = psycopg2.connect(
                 host="localhost",
                 database="postgres",
@@ -149,6 +152,27 @@ class cdcProducer(Producer):
                 self.last_action_id = records[-1][0]
             else:
                 print('No new CDC records found.')
+                port = '5432',
+                password="postgres")
+            conn.autocommit = True
+            cur = conn.cursor()
+            conn.autocommit = True
+            cur = conn.cursor()
+            self.load_offset(cur)
+            cur.execute("""
+                SELECT action_id, first_name, last_name, dob, city, salary, action, created_at
+                        FROM emp_cdc 
+                WHERE action_id > %s
+            """, (
+                self.last_action_id,
+            ))
+            records = cur.fetchall()
+            if records:
+                print(f'Fetched {len(records)} new CDC records.')
+                last_action_id = records[-1][0]
+                self.save_offset(cur, last_action_id)
+            cur.close()
+            conn.close()
 
         except Exception as err:
             print(f'Error fetching CDC data: {err}')
@@ -311,7 +335,13 @@ class cdcProducer(Producer):
             return False
         
         return success_count == len(records)
+        return records
     
+    def delivery_callback(self, err, msg):
+        if err:
+            print(f'Message delivery failed: {err}')
+        else:
+            print(f'Message delivered to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}')
 
 if __name__ == '__main__':
     """
@@ -355,4 +385,23 @@ if __name__ == '__main__':
     except Exception as e:
         print(f'Fatal error in producer: {e}')
         producer.running = False
+    while producer.running:
+        try:
+            cdc_records = producer.fetch_cdc()
+
+            for record in cdc_records:
+                employee = Employee.from_line(record)
+                message = employee.to_json()
+                producer.produce(
+                    topic= employee_topic_name,
+                    key = encoder(str(employee.emp_id)),
+                    value = encoder(message),
+                    callback= producer.delivery_callback
+                )
+                producer.poll(0)
+                print(f'Completed {employee.action} for emp_id: {employee.emp_id}')
+            producer.flush()
+        except Exception as e:
+            print(f'Encountered error: {e}')
+            print("Actual DB error:", repr(e))
     

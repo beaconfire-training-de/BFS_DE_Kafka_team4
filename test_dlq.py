@@ -38,7 +38,7 @@ def check_dlq_topic():
     
     kafka_container = get_kafka_container()
     if not kafka_container:
-        print("✗ Kafka container not found")
+        print("Kafka container not found")
         return False
     
     try:
@@ -53,17 +53,17 @@ def check_dlq_topic():
         if result.returncode == 0:
             topics = result.stdout.strip().split('\n')
             if 'bf_employee_cdc_dlq' in topics:
-                print("✓ DLQ topic 'bf_employee_cdc_dlq' exists")
+                print(" DLQ topic 'bf_employee_cdc_dlq' exists")
                 return True
             else:
-                print("✗ DLQ topic not found")
+                print("DLQ topic not found")
                 print(f"  Available topics: {topics}")
                 return False
         else:
-            print(f"✗ Failed to list topics: {result.stderr}")
+            print(f"Failed to list topics: {result.stderr}")
             return False
     except Exception as e:
-        print(f"✗ Error checking DLQ topic: {e}")
+        print(f"Error checking DLQ topic: {e}")
         return False
 
 
@@ -75,7 +75,7 @@ def view_dlq_messages(count=5):
     
     kafka_container = get_kafka_container()
     if not kafka_container:
-        print("✗ Kafka container not found")
+        print("Kafka container not found")
         return False
     
     try:
@@ -108,12 +108,12 @@ def view_dlq_messages(count=5):
                     print()
             return True
         else:
-            print("⚠️  No DLQ messages found")
+            print(" No DLQ messages found")
             print("  This is OK if no failures have occurred")
             return True  # Not a failure
             
     except Exception as e:
-        print(f"✗ Error viewing DLQ messages: {e}")
+        print(f"Error viewing DLQ messages: {e}")
         return False
 
 
@@ -125,7 +125,7 @@ def count_dlq_messages():
     
     kafka_container = get_kafka_container()
     if not kafka_container:
-        print("✗ Kafka container not found")
+        print("Kafka container not found")
         return False
     
     try:
@@ -151,11 +151,11 @@ def count_dlq_messages():
             print(f"Total DLQ messages: {total}")
             return True
         else:
-            print(f"✗ Failed to count messages: {result.stderr}")
+            print(f"Failed to count messages: {result.stderr}")
             return False
             
     except Exception as e:
-        print(f"✗ Error counting DLQ messages: {e}")
+        print(f"Error counting DLQ messages: {e}")
         return False
 
 
@@ -198,10 +198,10 @@ def stop_db_dst():
             time.sleep(2)  # Give it a moment to fully stop
             return True
         else:
-            print(f"✗ Failed to stop database: {result.stderr}")
+            print(f"Failed to stop database: {result.stderr}")
             return False
     except Exception as e:
-        print(f"✗ Error stopping database: {e}")
+        print(f"Error stopping database: {e}")
         return False
 
 
@@ -220,10 +220,10 @@ def start_db_dst():
             time.sleep(3)  # Give it a moment to fully start
             return True
         else:
-            print(f"✗ Failed to start database: {result.stderr}")
+            print(f"Failed to start database: {result.stderr}")
             return False
     except Exception as e:
-        print(f"✗ Error starting database: {e}")
+        print(f"Error starting database: {e}")
         return False
 
 
@@ -252,7 +252,7 @@ def test_consumer_dlq_scenario():
     # Stop database if running
     if db_was_running:
         if not stop_db_dst():
-            print("✗ Failed to stop database. Cannot proceed with test.")
+            print("Failed to stop database. Cannot proceed with test.")
             return False
     
     # Insert test record
@@ -284,7 +284,7 @@ def test_consumer_dlq_scenario():
         cur.close()
         conn.close()
         
-        print(f"✓ Test record inserted (emp_id={test_emp_id})")
+        print(f"Test record inserted (emp_id={test_emp_id})")
         
         # Wait a bit for producer to detect and publish
         print("\nWaiting 5 seconds for producer to detect and publish the message...")
@@ -312,19 +312,19 @@ def test_consumer_dlq_scenario():
                     messages = result.stdout.strip().split('\n')
                     for msg in messages:
                         if str(test_emp_id) in msg:
-                            print(f"✓ Message found in main topic (emp_id={test_emp_id})")
+                            print(f"Message found in main topic (emp_id={test_emp_id})")
                             message_published = True
                             break
                     if not message_published:
-                        print("⚠️  Message not found in main topic yet")
+                        print(" Message not found in main topic yet")
                         print("  Make sure producer.py is running")
                 else:
-                    print("⚠️  Could not verify message in main topic")
+                    print("Could not verify message in main topic")
             except Exception as e:
-                print(f"⚠️  Error checking main topic: {e}")
+                print(f"Error checking main topic: {e}")
         
         if not message_published:
-            print("\n⚠️  Warning: Message may not have been published yet.")
+            print("\nWarning: Message may not have been published yet.")
             print("  Make sure producer.py is running and polling for changes")
         
         print("\nWaiting for consumer to process (retries + DLQ)...")
@@ -362,7 +362,7 @@ def test_consumer_dlq_scenario():
                                 if len(parts) >= 3:
                                     current_count += int(parts[-1])
                         if current_count > dlq_count_before:
-                            print(f"  ✓ DLQ message detected! (count: {current_count})")
+                            print(f"  DLQ message detected! (count: {current_count})")
                             break
             except:
                 pass
@@ -424,13 +424,13 @@ def test_consumer_dlq_scenario():
         # Determine test result
         if dlq_count_after > dlq_count_before:
             print("\n" + "=" * 60)
-            print("✓ Consumer DLQ test PASSED!")
+            print("Consumer DLQ test PASSED!")
             print(f"  Found {dlq_count_after - dlq_count_before} new message(s) in DLQ")
             print("=" * 60)
             test_passed = True
         else:
             print("\n" + "=" * 60)
-            print("⚠️  Consumer DLQ test - No new messages in DLQ")
+            print("Consumer DLQ test - No new messages in DLQ")
             print("=" * 60)
             print("\nPossible reasons:")
             print("  1. Consumer is not running")
@@ -460,7 +460,7 @@ def test_consumer_dlq_scenario():
         return test_passed
             
     except Exception as e:
-        print(f"✗ Error in consumer DLQ test: {e}")
+        print(f"Error in consumer DLQ test: {e}")
         # Try to restart database even on error
         if db_was_running:
             print("\nAttempting to restart database after error...")
