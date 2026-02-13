@@ -55,14 +55,11 @@ class cdcConsumer(Consumer):
                 msg = self.poll(timeout=1.0)
                 print(msg)
                 if msg is None:
-                    print('check')
                     continue
                 elif msg.error():
                     raise KafkaException(msg.error())
                 else:
-                    print('uh')
                     processing_func(msg)
-                    print('works')
         finally:
             self.close()
 
@@ -70,10 +67,10 @@ def update_dst(msg):
     e = Employee(**(json.loads(msg.value())))
     try:
         conn = psycopg2.connect(
-            host="localhost",
+            host="db_dst",
             database="postgres",
             user="postgres",
-            port = '5433', 
+            port = '5432', 
             password="postgres")
         conn.autocommit = True
         cur = conn.cursor()
@@ -113,5 +110,6 @@ def update_dst(msg):
         print(err)
 
 if __name__ == '__main__':
-    consumer = cdcConsumer(group_id='employee-migration-v2') 
+    # test
+    consumer = cdcConsumer(group_id='bf_employee_cdc_group', host= 'kafka', port= 9092) 
     consumer.consume([employee_topic_name], update_dst)

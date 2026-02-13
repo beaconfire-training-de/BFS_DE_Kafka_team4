@@ -74,7 +74,7 @@ class cdcProducer(Producer):
         try:
             records = []
             conn = psycopg2.connect(
-                host="localhost",
+                host="db_source",
                 database="postgres",
                 user="postgres",
                 port = '5432',
@@ -112,7 +112,8 @@ class cdcProducer(Producer):
 
 if __name__ == '__main__':
     encoder = StringSerializer('utf-8')
-    producer = cdcProducer()
+    # test kafka
+    producer = cdcProducer(host= 'kafka', port = 9092)
     
     while producer.running:
         try:

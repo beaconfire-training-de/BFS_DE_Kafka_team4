@@ -22,7 +22,6 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_MIN_INSYNC_REPLICAS: 1
 
-  # Simple topic setup - runs once and exits
   kafka-setup:
     image: confluentinc/cp-kafka:7.4.0
     depends_on:
@@ -31,11 +30,11 @@ services:
       bash -c "
         echo 'Waiting for Kafka...'
         sleep 10
-        
+
         echo 'Creating topics...'
         kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic bf_employee_cdc
         kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 --topic bf_employee_cdc_dlq
-        
+
         echo 'Topics created!'
         kafka-topics --list --bootstrap-server kafka:9092
       "
@@ -62,10 +61,50 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=postgres
     ports:
-      - '5433:5432'
+      - "5433:5432"
     volumes:
       - db_dst:/var/lib/bf_kafka_proj2_dst/data
       - ./scripts/destination:/docker-entrypoint-initdb.d
+
+  producer:
+    build: 
+      context: .
+      dockerfile: DockerFile
+    depends_on:
+      - kafka
+      - db_source
+      - kafka-setup
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: bf_employee_cdc
+      DB_HOST: db_source
+      DB_PORT: "5432"
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    command: ["python", "producer.py"]
+    restart: always
+
+  consumer:
+    build: 
+      context: .
+      dockerfile: DockerFile
+    depends_on:
+      - kafka
+      - db_dst
+      - kafka-setup
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: bf_employee_cdc
+      KAFKA_DLQ_TOPIC: bf_employee_cdc_dlq
+      KAFKA_CONSUMER_GROUP: bf_employee_cdc_group
+      DB_HOST: db_dst
+      DB_PORT: "5432"
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    command: ["python", "consumer.py"]
+    restart: always
 
 volumes:
   db_source:
